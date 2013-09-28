@@ -21,14 +21,14 @@ colorsShapes.game = (function() {
 
                     var layer = new Kinetic.Layer();
 
-                    //Player Board
-                    drawCanvasBoard(layer, 1, playerTokens.length, config.playerBoard.x_begin, config.playerBoard.y_begin, config.tile.size);
                     //Board
-                    //drawCanvasBoard(layer, config.board.rows, config.board.cols, config.board.x_begin, config.board.y_begin, config.tile.size);
-                    //Player tokens
-                    drawPlayerTokens(layer, config.tile.size);
+                    drawCanvasBoard(layer, config.board.rows, config.board.cols, config.board.x_begin, config.board.y_begin, config.tile.size);
                      //Board tokens
                     drawBoardTokens(layer, config.tile.size);
+                    //Player Board
+                    drawCanvasBoard(layer, 1, playerTokens.length, config.playerBoard.x_begin, config.playerBoard.y_begin, config.tile.size);
+                    //Player tokens
+                    drawPlayerTokens(layer, config.tile.size);
 
                     stage.add(layer);
 
@@ -100,15 +100,34 @@ colorsShapes.game = (function() {
 
 			        var boardTokens = JSON.parse(sessionStorage.getItem("boardTokens"));
 
+			        /*var group = new Kinetic.Group({
+	       							draggable: true
+	      				});
+
+					group.on('mouseover', function() {
+						document.body.style.cursor = 'pointer';
+					});
+					group.on('mouseout', function() {
+						document.body.style.cursor = 'default';
+					});
+
+					group.on('dragend', function(obj) {
+						//alert(group.attrs.x+","+group.attrs.y);
+						dragEndGroup(this);
+					});*/
+
 		        	for(var i=0; i<boardTokens.length;i++){
 
-                    	var token = drawToken(boardTokens[i], layer, size, size*(boardTokens[i].x_position+0.5), (size*(boardTokens[i].y_position+0.5))+2*size, false, "grey");
+                    	var token = drawToken(boardTokens[i], null, size, size*(boardTokens[i].x_position+0.5), (size*(boardTokens[i].y_position+0.5))+2*size, false, "grey");
 						token.init = i;
-                        	
-                        layer.add(token);
+
+						layer.add(token);                        	
+                        //group.add(token);
 
                         sessionStorage.setItem("boardTokensTokens", JSON.stringify(boardTokens));
                     }
+
+                    //layer.add(group);
 		        }
 
 		function drawToken(token, layer, size, x_position, y_position, draggable, strokeColor){
@@ -219,26 +238,24 @@ colorsShapes.game = (function() {
 		}
 
 		if(draggable){
-			// add cursor styling
-			boardToken.on('mouseover', function() {
-				document.body.style.cursor = 'pointer';
-			});
-							
-			boardToken.on('mouseout', function() {
-				document.body.style.cursor = 'default';
-			});
+				// add cursor styling
+				boardToken.on('mouseover', function() {
+					document.body.style.cursor = 'pointer';
+				});
+								
+				boardToken.on('mouseout', function() {
+					document.body.style.cursor = 'default';
+				});
+				//Move to init position
+				boardToken.on('dblclick', function(obj) {
+					doubleClick(this, layer);
+				});
 
-			//Move to init position
-			boardToken.on('dblclick', function(obj) {
-				doubleClick(this);
-			});
-
-			boardToken.on('dragend', function(obj) {
-				dragEnd(this, layer);
-			});
-		}
-
-		return boardToken;
+				boardToken.on('dragend', function(obj) {
+					dragEnd(this, layer);
+				});
+			}
+			return boardToken;
 	}
 
 	/*Move token functions*/
@@ -252,14 +269,21 @@ colorsShapes.game = (function() {
 					tween.play();
 					token.x_position = x_position;
 					token.y_position = y_position;
+					if((token.x_position_init==null && token.y_position_init==null)||(token.x_position==null && token.y_position==null)){
+                    	token.x_position_init = x_position;
+						token.y_position_init = y_position;
+					}
 					token.onBoard = onBoard;
 	}
 
-	function doubleClick(token){
+	function doubleClick(token, layer){
 
 		var playerTokens = JSON.parse(sessionStorage.getItem("playerTokens"));
 		for (var i = playerTokens.length - 1; i >= 0; i--) {
 			if(token.attrs.id == playerTokens[i].id){
+				//romeveTokenGroup(token);
+				layer.add(token);
+
 				moveToken(token, playerTokens[i], false, playerTokens[i].x_init, playerTokens[i].y_init, null, null);
 				sessionStorage.setItem("playerTokens", JSON.stringify(playerTokens));
 			}
@@ -275,21 +299,93 @@ colorsShapes.game = (function() {
 				//Move to board
 				if(token.attrs.y>=config.board.y_begin){
 
+					//new coordenates
 					var x_coordenates = parseInt(token.attrs.x/config.tile.size)*config.tile.size+config.tile.size/2;
 					var y_coordenates = parseInt(token.attrs.y/config.tile.size)*config.tile.size+config.tile.size/2+playerTokens[i].y_margin;
+					//New position
 					var x_position = parseInt(x_coordenates/config.tile.size);
 					var y_position = parseInt(y_coordenates/config.tile.size)-2;
 
 					if(checkMove(playerTokens[i], x_position, y_position)){
 						moveToken(token, playerTokens[i], true, x_coordenates, y_coordenates, x_position, y_position);
+						romeveTokenGroup(token);
+						for (var e = 0; e<layer.children.length; e++) {
+							if(layer.children[e].nodeType  == "Group"){
+								layer.children[e].add(token);
+								break;
+							}
+						}
 					}else{
+						romeveTokenGroup(token);
+						layer.add(token);
 						moveToken(token, playerTokens[i], false, playerTokens[i].x_init, playerTokens[i].y_init, null, null);
 					}
 				}else{
+					romeveTokenGroup(token);
+					layer.add(token);
 					moveToken(token, playerTokens[i], false, playerTokens[i].x_init, playerTokens[i].y_init, null, null);
 				}
 			}
 		}
+		sessionStorage.setItem("playerTokens", JSON.stringify(playerTokens));
+	}
+
+	function romeveTokenGroup(token){
+		var parent = token.parent;
+		if(parent.nodeType == "Group"){
+			for (var e = 0; e<parent.children.length; e++) {
+				if(parent.children[e].attrs.id  == token.attrs.id){
+					parent.children[e].remove();
+					break;
+				}
+			};
+		}
+	}
+
+	function dragEndGroup(group){
+
+		var boardTokens = JSON.parse(sessionStorage.getItem("boardTokens"));
+		var playerTokens = JSON.parse(sessionStorage.getItem("playerTokens"));
+
+		//New coordenates
+		var x_coordenates = parseInt(group.attrs.x/config.tile.size)*config.tile.size;
+		var y_coordenates = parseInt(group.attrs.y/config.tile.size)*config.tile.size;
+		//New position
+		var x_position = parseInt(x_coordenates/config.tile.size);
+		var y_position = parseInt(y_coordenates/config.tile.size);
+
+		var tween = new Kinetic.Tween({
+										    node: group, 
+										    duration: 0.1,
+										    x: x_coordenates,
+										    y: y_coordenates,
+										  });
+		tween.play();
+
+
+		for (var i = group.children.length - 1; i >= 0; i--) {
+			var token = group.children[i];
+			//var x_position = parseInt(token.attrs.x/config.tile.size);
+			//var y_position = parseInt(token.attrs.y/config.tile.size)-2;
+
+			for (var e = playerTokens.length - 1; e >= 0; e--) {
+				if(token.id == playerTokens[e].id){
+					playerTokens[e].x_position = playerTokens[e].x_position_init+x_position;
+					playerTokens[e].y_position = playerTokens[e].y_position_init+y_position;
+					break;				
+				}
+			}
+
+			for (var e = boardTokens.length - 1; e >= 0; e--) {
+				if(token.attrs.id == boardTokens[e].id){
+					boardTokens[e].x_position = boardTokens[e].x_position_init+x_position;
+					boardTokens[e].y_position = boardTokens[e].y_position_init+y_position;
+					break;
+				}
+			}
+		}
+
+		sessionStorage.setItem("boardTokens", JSON.stringify(boardTokens));
 		sessionStorage.setItem("playerTokens", JSON.stringify(playerTokens));
 	}
 
@@ -466,8 +562,10 @@ colorsShapes.game = (function() {
 
 		for (var i = playerTokens.length - 1; i >= 0; i--) {
 			if(playerTokens[i].onBoard)
-				if(!isJoinedTokenCheck(boardTokens, playerTokens, playerTokens[i], null))
+				if(!isJoinedTokenCheck(boardTokens, playerTokens, playerTokens[i], null)){
+					alert("Token: "+playerTokens[i].x_position+","+playerTokens[i].y_position);
 					return false;
+				}
 		};
 		return true;
 	}
@@ -487,7 +585,8 @@ colorsShapes.game = (function() {
 			if(playerTokens[numBoardToken].onBoard && playerTokens[numBoardToken].id != token.id && (previoustoken==null || playerTokens[numBoardToken].id != previoustoken.id))
 				if(	(playerTokens[numBoardToken].x_position==token.x_position && (playerTokens[numBoardToken].y_position==token.y_position-1 || playerTokens[numBoardToken].y_position==token.y_position+1)) ||
 					(playerTokens[numBoardToken].y_position==token.y_position && (playerTokens[numBoardToken].x_position==token.x_position-1 || playerTokens[numBoardToken].x_position==token.x_position+1)))
-					return isJoinedTokenCheck(boardTokens, playerTokens, playerTokens[numBoardToken], token);
+					if(isJoinedTokenCheck(boardTokens, playerTokens, playerTokens[numBoardToken], token))
+						return true;
 		}
 		return false;
 	}

@@ -1,148 +1,113 @@
 App.events = (function(app, $, undefined) {
+
+    var gameClient;
     
     $(document).ready(function() {
 
         $.ajaxSetup({ cache: false });
 
-        var gameid = document.getElementById('gameid').value;
-        var playerTokens = null;
+        var gr = new GRClient('http://localhost:8000');
 
-        if(gameid==null || gameid=='')
-            $('.action-create').show();
-        else
-            $('.action-start').show().attr('gameid', gameid);
+        var player = JSON.parse(sessionStorage.getItem("playerSession"));
 
-        $('input').focus();
+        console.log(player);
 
-        app.io.get('/engines', null, function(games) {
-            //$("#gameListTemplate").tmpl({games:games}).appendTo($("#gamelist"));
+        // set user auth
+        // this should invoked if the player changes (every turn)
+        gr.credentials(player.id, player.password);
 
-            $.each(games, function(idx, game) {
-                $('#engine').append($('<option />').attr('value', game).text(game));
-            });
-        });
+        // create new game instance
+        gr.create_game(config.engine, function(client){
+                  
+                  // save somewhere the game-client
+                  gameClient = client;
 
-        
+                  config.gameid = client.get_game_id();
 
-      
-        // listen action events
-        $('.action-create').click(function() {
+                  console.log('created game ', config.gameid);
 
-            console.log("Creating new game");
+                  // add registered players to game
+                  client.add_player(player.id, function(result){
+                    console.log('add player a', result)
+                  });
 
-            var engine = document.getElementById('engine').value;     
-            var path = '/engines/:engine/create'.replace(':engine', engine);
-            console.log("Engine "+engine);
-
-            var selected_checks = $('#playerchecks').find(':checkbox:checked');
-
-            //var data = {random:Math.random()};
-
-            app.io.post(path, null, function(game) {
-
-                    var add_player_path = '/games/:gameid/addplayer/:playerid'
-                        .replace(':gameid', game.id)
-                        .replace(':playerid', document.getElementById('playerid').value);
-                    
-                    app.io.post(add_player_path, null, function(player) {
-                        //console.log('added player %s to game %s', player.id, game.id);
-
-                        $('.action-create').hide();
-                        $('.action-start').show().attr('gameid', game.id);
-                    });
-            });
-
-            return false;
-        });
-
-        $('.action-start').click(function() {
-            var gameid = $(this).attr('gameid');
-            //var engine = document.getElementById('engine').value;    
-            var path = '/games/:gameid/start'.replace(':gameid', gameid);
-
-            app.io.post(path, null, function(success) {
-
-                    console.log('game started!! id=%s', gameid);
-                    var status_path = '/games/:gameid/status'.replace(':gameid', gameid);
-
-                    var data = {
-                            gameid: gameid,
-                            playerid: document.getElementById('playerid').value
-                        }
-
-                    app.io.post(status_path, data, function(res) {
-                        console.log('Getting player tokens ');
-
-                        $('.action-create').hide();
-                        $('.action-start').hide();
-                        $('.action-next').show().attr('gameid', gameid);
-
-                        sessionStorage.setItem("playerTokens", JSON.stringify(res.playerData.playerTokens));
-                        sessionStorage.setItem("boardTokens", JSON.stringify(res.playerData.boardTokens));
-
-                        colorsShapes.game.loadGame();
-                        //colorsShapes.board.drawCanvasBoard(document.getElementById("canvasBoard"));
-                        
-                        //colorsShapes.board.drawCanvasBoard(document.getElementById("canvasBoard"));
-                        //colorsShapes.board.drawCanvasPlayerTokens(document.getElementById("canvasPlayerTokens"), data.playerTokens);*/
-                    });
+                  client.add_player('b', function(result){
+                    console.log('add player b', result)
+                  });
 
 
-                //}
+                  }, 500);
+
+            $('.action-start').click(function() {
+
+                console.log('game started!! id=%s', config.gameid);
                 
+                gameClient.start(function(result){
+                        console.log('start game', result)
+
+                        // after start game, send player command
+                        gameClient.send_command({foo:'bar'}, function(result){
+                          console.log('command', result);
+                        });
+
+                        // retrieve game status
+                        gameClient.get_status(function(result){
+                          console.log('get game status', result)
+
+                              console.log('Getting player tokens ');
+
+                              $('.action-create').hide();
+                              $('.action-start').hide();
+                              $('.action-next').show().attr('gameid', config.gameid);
+
+                              sessionStorage.setItem("playerTokens", JSON.stringify(result.playerData.playerTokens));
+                              sessionStorage.setItem("boardTokens", JSON.stringify(result.playerData.boardTokens));
+
+                              colorsShapes.game.loadGame();
+
+                        });
+                      });
+              return false;
             });
 
-            
+          $('.action-next').click(function() {
 
+              var correctMove = colorsShapes.game.endMove(playerTokens);
 
+              if(correctMove){
 
-            return false;
-        });
+                  var gameid = $(this).attr('gameid');
+                  var path = '/games/:gameid/command'.replace(':gameid', gameid);
 
-        $('.action-next').click(function() {
+                  var playerTokens = JSON.parse(sessionStorage.getItem("playerTokens"));
 
-            var correctMove = colorsShapes.game.endMove(playerTokens);
+                  var data = {
+                              gameid: gameid,
+                              playerid: document.getElementById('playerid').value,
+                              playerTokens: playerTokens
+                          }
 
-            if(correctMove){
+                  app.io.post(path, data, function(res) {
 
-                var gameid = $(this).attr('gameid');
-                var path = '/games/:gameid/command'.replace(':gameid', gameid);
-
-                var playerTokens = JSON.parse(sessionStorage.getItem("playerTokens"));
-
-                var data = {
-                            gameid: gameid,
-                            playerid: document.getElementById('playerid').value,
-                            playerTokens: playerTokens
-                        }
-
-                app.io.post(path, data, function(res) {
-
-                    if(!res.is_valid)
-                        alert("Ha ocurrido un error en la validación del movimiento en el servidor.");
-                    else{
-                        sessionStorage.setItem("playerTokens", JSON.stringify(res.playerData.playerTokens));
-                        sessionStorage.setItem("boardTokens", JSON.stringify(res.playerData.boardTokens));
-                        colorsShapes.game.loadGame();
-                    }
-                 
-                });
-            }
-            
-            return false;
-        });
-
-
-        // listen global events
-        
+                      if(!res.is_valid)
+                          alert("Ha ocurrido un error en la validación del movimiento en el servidor.");
+                      else{
+                          sessionStorage.setItem("playerTokens", JSON.stringify(res.playerData.playerTokens));
+                          sessionStorage.setItem("boardTokens", JSON.stringify(res.playerData.boardTokens));
+                          colorsShapes.game.loadGame();
+                      }
+                   
+                  });
+              }
+              
+              return false;
+          });     
+      
+      return {
+          raise_global : function(event_name, params) {
+              $(document).trigger(event_name, Array.prototype.slice.call(arguments, 1))
+          }
+      };
     });
-
-   
-    
-    return {
-        raise_global : function(event_name, params) {
-            $(document).trigger(event_name, Array.prototype.slice.call(arguments, 1))
-        }
-    };
     
 })(App || {}, jQuery);

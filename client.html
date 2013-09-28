@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <!-- js libs-->
+  <script src="js/jquery-1.7.2.js"></script>
+  <script src="js/gamerunner-client.js"></script>
+</head>
+
+<body>
+  
+  <script>
+    var gr = new GRClient('http://localhost:8000');
+
+    // register players in the system
+    gr.register_player('a', {name:'a name'}, function(result){
+      console.log('register player a', result)
+    });
+
+    gr.register_player('b', {name:'b name'}, function(result){
+      console.log('register player b', result)
+    });
+
+    // set user auth
+    // this should invoked if the player changes (every turn)
+    gr.credentials('a', 'my_pass');
+
+    // create new game instance
+    gr.create_game('colorsShapes', function(client){
+      
+      // save somewhere the game-client
+      window.client = client;
+
+      console.log('created game ', client.get_game_id());
+
+      // add registered players to game
+      client.add_player('a', function(result){
+        console.log('add player a', result)
+      });
+
+      client.add_player('b', function(result){
+        console.log('add player b', result)
+      });
+
+      // wait some time before start game
+      setTimeout(function() {
+
+        client.start(function(result){
+          console.log('start game', result)
+
+          // after start game, send player command
+          client.send_command({foo:'bar'}, function(result){
+            console.log('command', result);
+          });
+
+          // retrieve game status
+          client.get_status(function(result){
+            console.log('get game status', result)
+          });
+
+        });
+
+      }, 500);
+	    
+    });
+    
+    
+  </script>
+  
+</body>
+
+</html>
