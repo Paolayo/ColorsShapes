@@ -1,12 +1,13 @@
 App.events = (function(app, $, undefined) {
 
     var gameClient;
+    var gr;
     
     $(document).ready(function() {
 
         $.ajaxSetup({ cache: false });
 
-        var gr = new GRClient('http://localhost:8000');
+        gr = new GRClient('http://localhost:8000');
 
         var player = JSON.parse(sessionStorage.getItem("playerSession"));
 
@@ -35,15 +36,26 @@ App.events = (function(app, $, undefined) {
                     console.log('add player b', result)
                   });
 
+                  var game = {id:client.get_game_id()};
+                  sessionStorage.setItem("game", JSON.stringify(game));
+                  config.game = game;
 
                   }, 500);
 
             $('.action-start').click(function() {
 
-                console.log('game started!! id=%s', config.gameid);
-                
-                gameClient.start(function(result){
-                        console.log('start game', result)
+                var game = JSON.parse(sessionStorage.getItem("game"));
+                //game = config.game;
+
+                console.log('game started!! id=%s', game.id);
+
+                //Init data jason
+                var data={};
+                data.player=player;
+                data.game=game;
+
+                gameClient.start(data,function(result){
+                        console.log('start game', result);
 
                         // after start game, send player command
                         gameClient.send_command({foo:'bar'}, function(result){
@@ -58,7 +70,7 @@ App.events = (function(app, $, undefined) {
 
                               $('.action-create').hide();
                               $('.action-start').hide();
-                              $('.action-next').show().attr('gameid', config.gameid);
+                              $('.action-next').show().attr('gameid', game.id);
 
                               sessionStorage.setItem("playerTokens", JSON.stringify(result.playerData.playerTokens));
                               sessionStorage.setItem("boardTokens", JSON.stringify(result.playerData.boardTokens));

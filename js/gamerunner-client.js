@@ -59,9 +59,9 @@ var GRClient = (function($, undefined) {
             post(path, {}, callback, auth);
         }
 
-        this.start = function(callback) {
+        this.start = function(data, callback) {
             var path = prefix + '/start';
-            post(path, {}, callback, auth);
+            post(path, data, callback, auth);
         }
 
         this.end = function(callback) {

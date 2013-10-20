@@ -2,7 +2,6 @@ var config = {};
 
 config.serverPath = 'http://localhost:8000';
 config.engine = 'colorsShapes';
-config.gameid = '';
 
 config.tile = {size : 32};
 
